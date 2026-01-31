@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from torch_geometric.datasets import GeometricShapes
@@ -29,6 +31,7 @@ def plot_graph(data, idx):
 
     ax.set_title(f"GeometricShapes graph {idx}")
     ax.axis("off")
+    return fig
 
 
 # Load dataset with FaceToEdge so edge_index is populated
@@ -39,6 +42,7 @@ dataset = GeometricShapes(root="data/GeometricShapes", pre_transform=transform)
 # Pick any 3 graphs
 indices = [0, 1, 2]
 for idx in indices:
-    plot_graph(dataset[idx], idx)
-
-plt.show()
+    fig = plot_graph(dataset[idx], idx)
+    fig.tight_layout()
+    fig.savefig(f"geometric_shapes_graph{idx}.png", dpi=200)
+    plt.close(fig)

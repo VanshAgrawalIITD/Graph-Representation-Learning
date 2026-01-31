@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import networkx as nx
 from torch_geometric.datasets import KarateClub
@@ -33,4 +35,5 @@ nx.draw(
     font_size=8,
 )
 plt.title("Karate Club Graph")
-plt.show()
+plt.tight_layout()
+plt.savefig("karate_club_graph.png", dpi=300)

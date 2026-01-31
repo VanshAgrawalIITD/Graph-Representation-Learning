@@ -59,7 +59,7 @@ The code is attached in Listing 1 in the appendix.
 \section{Part B: Visualizing the graph}
 \begin{figure}[H]
     \centering
-    \includegraphics[width=1\linewidth]{Screenshot 2026-01-27 at 7.46.20 PM.png}
+    \includegraphics[width=0.85\linewidth]{karate_club_graph.png}
     \vspace{0.5em}
 
     \begin{tabular}{llll}
@@ -79,9 +79,9 @@ We take the normalized structural feature matrix from C1 and reduce it to 2D usi
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.75\linewidth]{Screenshot 2026-01-30 at 7.40.23 PM.png}
+    \includegraphics[width=0.75\linewidth]{structural_pca.png}
     \caption{PCA of structural features; colors indicate the node labels.}
-    \label{fig:placeholder}
+    \label{fig:struct_pca}
 \end{figure}
 
 \subsection{C3. Node classification using structural features}
@@ -106,9 +106,9 @@ We reduce the node features to 2D using PCA and color by node labels. The visual
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.75\linewidth]{Screenshot 2026-01-30 at 10.19.43 PM.png}
+    \includegraphics[width=0.75\linewidth]{node_features_pca.png}
     \caption{PCA of node features; colors indicate the node labels.}
-    \label{fig:placeholder}
+    \label{fig:node_feat_pca}
 \end{figure}
 
 \section{Part E: Combining structure and node features}
@@ -148,6 +148,13 @@ The implementation is shown in Listing~\ref{lst:f1}.
 \section{2. Node2Vec vs Struct2Vec on GeometricShapes}
 \subsection{Part A: Load graphs and visualize the original geometry}
 We load the GeometricShapes dataset with \texttt{FaceToEdge} to populate \texttt{edge\_index}, select three graphs (indices 0, 1, 2), and plot their original geometry using \texttt{data.pos} with edges drawn from \texttt{data.edge\_index}.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.32\linewidth]{geometric_shapes_graph0.png}
+    \includegraphics[width=0.32\linewidth]{geometric_shapes_graph1.png}
+    \includegraphics[width=0.32\linewidth]{geometric_shapes_graph2.png}
+    \caption{Original geometry for GeometricShapes graphs 0, 1, and 2 (left to right).}
+\end{figure}
 
 \subsection{Part B: Node2Vec embeddings and visualization}
 \subsubsection{B1. Implement biased random walks}
@@ -156,6 +163,24 @@ We implement the Node2Vec transition rule on an undirected graph and use $p=10$.
 For each node, we generate multiple walks with a fixed length of 20 (10 walks per node in our runs) to build the skip-gram training corpus.
 \subsubsection{B3. Learn embeddings}
 We train a skip-gram model with negative sampling to produce 2D embeddings ($d=2$). We run Node2Vec with two settings: BFS-like walks ($q=0.5$) and DFS-like walks ($q=5$), then plot the graph using the learned embedding coordinates and the same edges.
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.49\linewidth]{node2vec_graph0_bfs.png}
+    \includegraphics[width=0.49\linewidth]{node2vec_graph0_dfs.png}
+    \caption{Node2Vec embeddings for graph 0 (left: BFS-like, right: DFS-like).}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.49\linewidth]{node2vec_graph1_bfs.png}
+    \includegraphics[width=0.49\linewidth]{node2vec_graph1_dfs.png}
+    \caption{Node2Vec embeddings for graph 1 (left: BFS-like, right: DFS-like).}
+\end{figure}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.49\linewidth]{node2vec_graph2_bfs.png}
+    \includegraphics[width=0.49\linewidth]{node2vec_graph2_dfs.png}
+    \caption{Node2Vec embeddings for graph 2 (left: BFS-like, right: DFS-like).}
+\end{figure}
 
 \subsection{Part C: Struct2Vec embeddings and visualization (fixed k=3)}
 \subsubsection{C1. Structural similarity function $g_k(u,v)$}
@@ -200,6 +225,8 @@ print(f"Number of node labels/classes: {dataset.num_classes}")
 
 \section{Graph Visualization Code}
 \begin{lstlisting}[language=Python,caption={Part A graph visualization}]
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import networkx as nx
 from torch_geometric.datasets import KarateClub
@@ -214,24 +241,35 @@ G = to_networkx(data, to_undirected=True)
 # Node colors based on labels
 labels = data.y.tolist()
 
+# Define colors to match the figure legend
+color_map = {
+    0: "#66C2A5",
+    1: "#FC8D62",
+    2: "#8DA0CB",
+    3: "#FFD92F",
+}
+node_colors = [color_map[label] for label in labels]
+
 # Draw the graph
 pos = nx.spring_layout(G, seed=42)
 plt.figure(figsize=(6, 5))
 nx.draw(
     G,
     pos,
-    node_color=labels,
-    cmap=plt.cm.Set2,
+    node_color=node_colors,
     with_labels=True,
     node_size=400,
     font_size=8,
 )
 plt.title("Karate Club Graph")
-plt.show()
+plt.tight_layout()
+plt.savefig("karate_club_graph.png", dpi=300)
 \end{lstlisting}
 
 \section{GeometricShapes Visualization Code}
 \begin{lstlisting}[language=Python,caption={GeometricShapes visualization (Part 2A)}]
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from torch_geometric.datasets import GeometricShapes
@@ -263,6 +301,7 @@ def plot_graph(data, idx):
 
     ax.set_title(f"GeometricShapes graph {idx}")
     ax.axis("off")
+    return fig
 
 
 # Load dataset with FaceToEdge so edge_index is populated
@@ -273,9 +312,10 @@ dataset = GeometricShapes(root="data/GeometricShapes", pre_transform=transform)
 # Pick any 3 graphs
 indices = [0, 1, 2]
 for idx in indices:
-    plot_graph(dataset[idx], idx)
-
-plt.show()
+    fig = plot_graph(dataset[idx], idx)
+    fig.tight_layout()
+    fig.savefig(f"geometric_shapes_graph{idx}.png", dpi=200)
+    plt.close(fig)
 \end{lstlisting}
 
 \section{Node2Vec (Biased Walks + Skip-gram) Code}
@@ -285,6 +325,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn, optim
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from torch_geometric.datasets import GeometricShapes
 from torch_geometric.transforms import FaceToEdge
@@ -702,6 +744,8 @@ if __name__ == "__main__":
 \section{Structural Embeddings Visualization Code}
 \begin{lstlisting}[language=Python,caption={Part C2 PCA visualization}]
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from torch_geometric.datasets import KarateClub
@@ -800,7 +844,7 @@ def main():
 
     plt.tight_layout()
     plt.savefig("structural_pca.png", dpi=200)
-    plt.show()
+    plt.close()
 
 
 if __name__ == "__main__":

@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 from torch_geometric.datasets import KarateClub
@@ -106,7 +108,7 @@ def main():
 
     plt.tight_layout()
     plt.savefig("structural_pca.png", dpi=200)
-    plt.show()
+    plt.close()
 
 
 if __name__ == "__main__":

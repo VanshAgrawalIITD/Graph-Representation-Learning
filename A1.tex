@@ -42,7 +42,8 @@
 
 \maketitle
 
-\section{Part A: PyG basics}
+\section{1. Node Embeddings with PyG}
+\subsection{Part A: PyG basics}
 The code is attached in Listing 1 in the appendix.
 \begin{itemize}
     \item Number of nodes: 34.
@@ -56,7 +57,7 @@ The code is attached in Listing 1 in the appendix.
 \texttt{data.\allowbreak edge\_index} is a 2 by number of edges sized matrix. The first row of the ith column represents the start point of the Ayat edge and the second row of the Ayat column represents the end point of the ith edge.
 \texttt{data.y} is the actual value which we want to train on. It can be for edges or nodes or the entire graph. We hide a part of \texttt{data.y} to be able to test our model and train it on the remaining part.
 
-\section{Part B: Visualizing the graph}
+\subsection{Part B: Visualizing the graph}
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.85\linewidth]{karate_club_graph.png}
@@ -71,10 +72,10 @@ The code is attached in Listing 1 in the appendix.
     \caption{Visualized graph: each color stands for a class.}
 \end{figure}
 
-\section{Part C: Structural feature embeddings}
-\subsection{C1. Structural features}
+\subsection{Part C: Structural feature embeddings}
+\subsubsection{C1. Structural features}
 We compute six structural features per node: degree, betweenness centrality, closeness centrality, PageRank, eigenvector centrality, and clustering coefficient. For each feature we build a vector ordered by node index (0 to $N-1$), then stack these vectors column-wise to obtain $X_{\text{struct}} \in \mathbb{R}^{N \times 6}$. Finally, we normalize each feature with z-score normalization (subtract mean and divide by standard deviation) to place all features on a comparable scale. The implementation is included in Listing 3 in the appendix.
-\subsection{C2. Visualize structural embeddings}
+\subsubsection{C2. Visualize structural embeddings}
 We take the normalized structural feature matrix from C1 and reduce it to 2D using PCA. The 2D points are then plotted and colored by the node labels. The visualization is shown in Figure~\ref{fig:struct_pca} and the code is in Listing 4.
 
 \begin{figure}[H]
@@ -84,7 +85,7 @@ We take the normalized structural feature matrix from C1 and reduce it to 2D usi
     \label{fig:struct_pca}
 \end{figure}
 
-\subsection{C3. Node classification using structural features}
+\subsubsection{C3. Node classification using structural features}
 We train two simple classifiers on $X_{\text{struct}}$ (6 structural features per node): a 2-layer MLP (6 $\rightarrow$ 16 $\rightarrow$ 4) and logistic regression. We evaluate both using stratified 5-fold cross-validation (seed 42). The mean test accuracies are:
 \begin{itemize}
     \item \textbf{MLP:} \textbf{56.19\%} $\pm$ \textbf{17.41\%} (mean train accuracy 100\%).
@@ -92,8 +93,8 @@ We train two simple classifiers on $X_{\text{struct}}$ (6 structural features pe
 \end{itemize}
 The implementation is shown in Listing~\ref{lst:c3}.
 
-\section{Part D: Node classification using node features}
-\subsection{D1. Node classification using node features only}
+\subsection{Part D: Node classification using node features}
+\subsubsection{D1. Node classification using node features only}
 We train the same two classifiers (MLP and logistic regression) on the raw node features $X = \texttt{data.x}$ and evaluate them with stratified 5-fold cross-validation (seed 42). The mean test accuracies are:
 \begin{itemize}
     \item \textbf{MLP:} \textbf{35.71\%} $\pm$ \textbf{9.04\%} (mean train accuracy 100\%).
@@ -101,7 +102,7 @@ We train the same two classifiers (MLP and logistic regression) on the raw node 
 \end{itemize}
 The implementation is shown in Listing~\ref{lst:d1}.
 
-\subsection{D2. Visualize node features}
+\subsubsection{D2. Visualize node features}
 We reduce the node features to 2D using PCA and color by node labels. The visualization is shown in Figure~\ref{fig:node_feat_pca} and the code is provided in Listing~\ref{lst:d2}.
 
 \begin{figure}[H]
@@ -111,7 +112,7 @@ We reduce the node features to 2D using PCA and color by node labels. The visual
     \label{fig:node_feat_pca}
 \end{figure}
 
-\section{Part E: Combining structure and node features}
+\subsection{Part E: Combining structure and node features}
 We concatenate the structural features from Part~C with the node features to form $X_{\text{comb}} = [X_{\text{struct}} \; X_{\text{attr}}]$. We train the same two classifiers (MLP and logistic regression) on $X_{\text{comb}}$ and evaluate them with stratified 5-fold cross-validation (seed 42). The mean test accuracies are:
 \begin{itemize}
     \item \textbf{MLP:} \textbf{38.10\%} $\pm$ \textbf{14.13\%} (mean train accuracy 100\%).
@@ -119,7 +120,7 @@ We concatenate the structural features from Part~C with the node features to for
 \end{itemize}
 The implementation is shown in Listing~\ref{lst:e1}.
 
-\section{Part F: Cora node classification (Planetoid)}
+\subsection{Part F: Cora node classification (Planetoid)}
 We repeat the node label prediction on the Cora dataset using the official PyG masks (\texttt{train\_mask}, \texttt{val\_mask}, \texttt{test\_mask}). We use the same structural features as in Part~C (6 structural statistics), the raw node features $X_{\text{attr}}=\texttt{data.x}$, and their concatenation $X_{\text{comb}}=[X_{\text{struct}} \; X_{\text{attr}}]$. A small MLP (input $\rightarrow$ 64 $\rightarrow$ 7) with ReLU and dropout is trained with Adam (lr=0.01, weight decay $5\times10^{-4}$) and early stopping on validation accuracy. The best validation and corresponding test accuracies are:
 
 \begin{table}[H]
@@ -138,7 +139,7 @@ We repeat the node label prediction on the Cora dataset using the official PyG m
 \end{table}
 The implementation is shown in Listing~\ref{lst:f1}.
 
-\section{Part G: Short discussion}
+\subsection{Part G: Short discussion}
 \begin{enumerate}
     \item \textbf{Best input.} On Cora, node features ($X_{\text{attr}}$) performed best (highest validation and test accuracy). Structural features alone were the weakest.
     \item \textbf{Why combining helps or not.} Combining did not help here because the structural features are relatively coarse and less aligned with topic labels than the bag-of-words node features. Concatenating them can add noise and increase dimensionality without adding strong predictive signal, which can slightly hurt or leave performance unchanged unless the model and hyperparameters are tuned for the mix.

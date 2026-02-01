@@ -141,9 +141,9 @@ The implementation is shown in Listing~\ref{lst:f1}.
 
 \subsection{Part G: Short discussion}
 \begin{enumerate}
-    \item \textbf{Best input.} On Cora, node features ($X_{\text{attr}}$) performed best (highest validation and test accuracy). Structural features alone were the weakest.
-    \item \textbf{Why combining helps or not.} Combining did not help here because the structural features are relatively coarse and less aligned with topic labels than the bag-of-words node features. Concatenating them can add noise and increase dimensionality without adding strong predictive signal, which can slightly hurt or leave performance unchanged unless the model and hyperparameters are tuned for the mix.
-    \item \textbf{What structure captures.} Structural features capture graph-topology information such as degree, centrality, clustering, and neighborhood connectivity patterns, i.e., how a node is positioned in the citation network. This relational role information is not present in the raw node attributes.
+    \item \textbf{Best input.} For Karate Club, structural features performed best because $X=\texttt{data.x}$ is an identity matrix and does not carry label-relevant content, leading to low accuracy with node features only. For Cora, the raw node features ($X_{\text{attr}}$) performed best, since the bag-of-words attributes are strongly aligned with the topic labels.
+    \item \textbf{Why combining helps or not.} On Karate Club, combining did worse than structural-only because the identity features add noise and dilute the structural signal. On Cora, combining did not help because the structural features were relatively weak and added noise on top of already strong node attributes.
+    \item \textbf{What structure captures.} Structural features capture graph-topology information such as degree, centrality, clustering, and neighborhood connectivity patterns, i.e., how a node is positioned in the network. This relational role information is not present in raw identity features (Karate) and is complementary, but not necessarily aligned, with bag-of-words attributes (Cora).
 \end{enumerate}
 
 \section{2. Node2Vec vs Struct2Vec on GeometricShapes}
@@ -202,10 +202,10 @@ We train a skip-gram model with negative sampling on these walks and produce 2D 
 
 \subsection{Part D: Comparison questions (short answers)}
 \begin{enumerate}
-    \item For all three graphs, the original geometry (pos) preserves the geometric shape best because it is the ground-truth layout. Among the learned embeddings, the Node2Vec (BFS-biased) plots look most similar to the originals for graphs 1 and 2 since they keep nearby nodes along the curve close together, whereas Struct2Vec groups nodes by role and distorts the geometric shape (especially graph 0).
-    \item Node2Vec mainly captures proximity/homophily: nodes that co-occur in short random walks or share local neighborhoods end up close in the embedding. It therefore emphasizes community or local-structure similarity rather than role similarity.
+    \item For all three graphs, the original geometry (pos) preserves the geometric shape best because it is the ground-truth layout. Among the learned embeddings, the Node2Vec (BFS-biased) plots look most similar to the originals for graphs 1 and 2 since they keep nearby nodes along the curve close together, whereas Struct2Vec groups nodes by role and distorts the geometric shape.
+    \item Node2Vec mainly captures proximity/homophily: nodes that co-occur in short random walks or share local neighborhoods end up close in the embedding. Because walks from nearby nodes are similar, Node2Vec can overlap points from the same neighborhood, folding the shape (e.g., a circle can look like a semicircle); opposite points connected by a chord can get overlapped in the embedding.
     \item Node2Vec struggles with structural similarity because its objective rewards co-occurrence in walks, so nodes that are structurally similar but far apart rarely appear together. As a result, same-role nodes in different regions are not pulled together.
-    \item Struct2Vec benefits nodes that share similar structural roles (e.g., hubs, bridges, peripheral/leaf nodes) even if they are far apart. It clusters nodes by degree and k-hop neighborhood patterns rather than geometric proximity.
+    \item Struct2Vec benefits nodes that share similar structural roles (e.g., hubs, bridges, peripheral/leaf nodes) even if they are far apart. If we squint at the plots, we can see nodes compacted into a handful of clusters (roughly 5--6 places), because the graph has only a few distinct node types based on degree and local neighborhood patterns. Struct2Vec groups those roles together, so many nodes collapse into a small number of locations in the embedding.
 \end{enumerate}
 
 \section{3. Graph-Based Sentiment Analysis with Node2Vec}
@@ -213,11 +213,11 @@ We train a skip-gram model with negative sampling on these walks and produce 2D 
 \subsubsection{A1. Text preprocessing}
 We use the IMDb sentiment dataset (aclImdb) with the provided train/test split, and to keep runtime reasonable we subsample 2000 positive and 2000 negative reviews for training and 1000 per class for testing. Each review is lowercased, punctuation/special characters are removed, text is tokenized on whitespace, and English stop words (sklearn list) are removed.
 \subsubsection{A2. Build the word graph}
-We build an undirected word co-occurrence graph from the training corpus with vocabulary size $V=5000$ (most frequent tokens). An edge is added between words that occur within a context window of $w=2$ in the same review, and edge weights equal the co-occurrence counts. This keeps the graph manageable while preserving local lexical relations.
+We build an undirected word co-occurrence graph from the training corpus with vocabulary size $V=5000$ (most frequent tokens). An edge is added between words that occur within a context window of $w=2$ in the same review, and we weight edges using positive PMI so frequent words are down-weighted while informative co-occurrences are emphasized. The motivation is that hubs like \textit{movie}, \textit{film}, or \textit{actor} appear with almost everything (e.g., \textit{awful movie}), which is not very informative; PMI reduces weights to such common nouns while giving higher weight to rarer, sentiment-bearing pairs such as \textit{awful}--\textit{boring}.
 
 \subsection{Part B: Learn word embeddings using Node2Vec}
 \subsubsection{B1. Apply Node2Vec}
-We run Node2Vec on the word graph with embedding dimension $d=64$, walk length $=10$, number of walks per node $=5$, and parameters $p=1.0$, $q=0.5$ (BFS-like bias). Skip-gram with negative sampling (5 negatives, window size 2) is trained for 3 epochs.
+We run Node2Vec on the word graph with embedding dimension $d=64$, walk length $=10$, number of walks per node $=20$, and parameters $p=1.0$, $q=0.5$ (BFS-like bias). Skip-gram with negative sampling (5 negatives, window size 2) is trained for 6 epochs.
 \subsubsection{B2. Inspect embeddings}
 Figure~\ref{fig:word_tsne} shows a t-SNE plot of the top-200 frequent words. Positive and negative sentiment words tend to form small local clusters, but there is still overlap, which is expected because the embeddings are driven by co-occurrence context rather than sentiment labels.
 
@@ -230,11 +230,11 @@ Figure~\ref{fig:word_tsne} shows a t-SNE plot of the top-200 frequent words. Pos
 
 \subsection{Part C: Text representation using graph embeddings}
 \subsubsection{C1. Document embeddings}
-Each document is represented by the average of its word embeddings (restricted to the vocabulary). This yields a single 64-D vector per review; documents with no in-vocabulary tokens are mapped to the zero vector.
+Each document is represented by a simple average (mean pooling) of its word embeddings. This ignores word order and relative importance, but yields one 64-D vector per review; documents with no in-vocabulary tokens are mapped to the zero vector.
 
 \subsection{Part D: Sentiment classification}
 \subsubsection{D1. Train a classifier}
-We train a logistic regression classifier on the document embeddings. On the test split, we obtain an accuracy of \textbf{75.75\%}. The implementation is shown in Listing~\ref{lst:sentiment}.
+We train a logistic regression classifier on the mean-pooled document embeddings. On the test split, we obtain an accuracy of \textbf{80.95\%}. The implementation is shown in Listing~\ref{lst:sentiment}.
 
 \subsection{Part E: Short discussion}
 \begin{enumerate}
@@ -1666,7 +1666,7 @@ def load_imdb_split(base_dir: Path, split: str, max_per_class: int | None = None
 
 def preprocess(text: str, stopwords: set[str]):
     text = text.lower()
-    text = re.sub(r"[^a-z0-9\\s]", " ", text)
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
     tokens = [t for t in text.split() if t and t not in stopwords]
     return tokens
 
@@ -1683,8 +1683,13 @@ def build_vocab(tokenized_texts, vocab_size: int):
 
 def build_cooc_graph(tokenized_texts, vocab, window_size: int):
     edge_counts = defaultdict(int)
+    word_counts = np.zeros(len(vocab), dtype=np.int64)
+    total_tokens = 0
     for tokens in tokenized_texts:
         filtered = [t for t in tokens if t in vocab]
+        for token in filtered:
+            word_counts[vocab[token]] += 1
+        total_tokens += len(filtered)
         for i, token in enumerate(filtered):
             u = vocab[token]
             for j in range(i + 1, min(i + window_size + 1, len(filtered))):
@@ -1694,10 +1699,17 @@ def build_cooc_graph(tokenized_texts, vocab, window_size: int):
                 a, b = (u, v) if u < v else (v, u)
                 edge_counts[(a, b)] += 1
 
+    total_pairs = sum(edge_counts.values())
     adj = [defaultdict(float) for _ in range(len(vocab))]
-    for (u, v), w in edge_counts.items():
-        adj[u][v] += w
-        adj[v][u] += w
+    for (u, v), count in edge_counts.items():
+        p_uv = count / total_pairs
+        p_u = word_counts[u] / total_tokens
+        p_v = word_counts[v] / total_tokens
+        pmi = np.log(p_uv / (p_u * p_v))
+        if pmi <= 0.0:
+            continue
+        adj[u][v] = pmi
+        adj[v][u] = pmi
     return adj
 
 
@@ -1730,15 +1742,27 @@ def node2vec_walk(start, walk_length, adj, p, q, rng):
     return walk
 
 
-def generate_walks(adj, num_walks, walk_length, p, q, seed=42):
+def generate_walks(adj, num_walks, walk_length, p, q, seed=42, num_workers=None):
+    """Generate Node2Vec walks sequentially (lower overhead on macOS)."""
     rng = np.random.default_rng(seed)
     nodes = np.arange(len(adj))
     walks = []
-    for _ in range(num_walks):
+
+    print("Generating walks (sequential - optimal for macOS)...")
+    total_walks_generated = 0
+
+    for walk_num in range(num_walks):
         rng.shuffle(nodes)
+        print(f"  Walk batch {walk_num + 1}/{num_walks}: ", end="")
+
         for node in nodes:
             if adj[node]:
-                walks.append(node2vec_walk(int(node), walk_length, adj, p, q, rng))
+                walk = node2vec_walk(int(node), walk_length, adj, p, q, rng)
+                walks.append(walk)
+                total_walks_generated += 1
+
+        print(f" ({total_walks_generated} total)")
+
     return walks
 
 
@@ -1755,8 +1779,18 @@ def build_pairs(walks, window_size):
     return pairs
 
 
-def train_skipgram(pairs, num_nodes, embed_dim, neg_dist, num_neg=5, epochs=3, batch_size=256, lr=0.01):
-    device = torch.device("cpu")
+def train_skipgram(pairs, num_nodes, embed_dim, neg_dist, num_neg=5, epochs=3, batch_size=2048, lr=0.01):
+    # Use GPU (MPS on macOS, CUDA on Linux/Windows) if available
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+        print("Using Metal Performance Shaders (GPU acceleration)")
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+        print("Using CUDA (GPU acceleration)")
+    else:
+        device = torch.device("cpu")
+        print("Using CPU")
+    
     emb_in = nn.Embedding(num_nodes, embed_dim).to(device)
     emb_out = nn.Embedding(num_nodes, embed_dim).to(device)
     nn.init.uniform_(emb_in.weight, -0.5 / embed_dim, 0.5 / embed_dim)
@@ -1764,21 +1798,32 @@ def train_skipgram(pairs, num_nodes, embed_dim, neg_dist, num_neg=5, epochs=3, b
 
     optimizer = optim.Adam([*emb_in.parameters(), *emb_out.parameters()], lr=lr)
     pairs = np.asarray(pairs, dtype=np.int64)
+    
+    # Pre-load pairs to GPU for better performance
+    pairs_gpu = torch.tensor(pairs, dtype=torch.long, device=device)
+    neg_dist = torch.tensor(neg_dist, dtype=torch.float32, device=device)
 
     for epoch in range(epochs):
-        rng = np.random.default_rng(42 + epoch)
-        rng.shuffle(pairs)
+        # Shuffle on GPU
+        perm = torch.randperm(len(pairs_gpu), device=device)
+        pairs_shuffled = pairs_gpu[perm]
+        
         total_loss = 0.0
-        for start in range(0, len(pairs), batch_size):
-            batch = pairs[start : start + batch_size]
-            centers = torch.tensor(batch[:, 0], dtype=torch.long, device=device)
-            contexts = torch.tensor(batch[:, 1], dtype=torch.long, device=device)
+        num_batches = (len(pairs_shuffled) + batch_size - 1) // batch_size
+        
+        for batch_idx in range(num_batches):
+            start = batch_idx * batch_size
+            end = min(start + batch_size, len(pairs_shuffled))
+            
+            batch = pairs_shuffled[start:end]
+            centers = batch[:, 0]
+            contexts = batch[:, 1]
 
             pos_score = (emb_in(centers) * emb_out(contexts)).sum(dim=1)
             pos_loss = F.logsigmoid(pos_score).mean()
 
-            neg_samples = rng.choice(num_nodes, size=(len(batch), num_neg), p=neg_dist)
-            neg_samples = torch.tensor(neg_samples, dtype=torch.long, device=device)
+            neg_samples = torch.multinomial(neg_dist, len(batch) * num_neg, replacement=True)
+            neg_samples = neg_samples.view(len(batch), num_neg)
             neg_emb = emb_out(neg_samples)
             center_emb = emb_in(centers).unsqueeze(2)
             neg_score = torch.bmm(neg_emb, center_emb).squeeze(2)
@@ -1789,7 +1834,11 @@ def train_skipgram(pairs, num_nodes, embed_dim, neg_dist, num_neg=5, epochs=3, b
             loss.backward()
             optimizer.step()
             total_loss += loss.item() * len(batch)
-        avg_loss = total_loss / len(pairs)
+            
+            if (batch_idx + 1) % max(1, num_batches // 10) == 0 or batch_idx + 1 == num_batches:
+                print(f"  Epoch {epoch + 1}/{epochs} - Batch {batch_idx + 1}/{num_batches}")
+        
+        avg_loss = total_loss / len(pairs_shuffled)
         print(f"Epoch {epoch + 1}/{epochs} - loss: {avg_loss:.4f}")
 
     return emb_in.weight.detach().cpu().numpy()
@@ -1852,19 +1901,29 @@ def main():
     vocab_size = 5000
     window_size = 2
 
+    print("Loading dataset...")
     train_texts, train_labels = load_imdb_split(base_dir, "train", max_per_class=max_train)
     test_texts, test_labels = load_imdb_split(base_dir, "test", max_per_class=max_test)
 
     stopwords = set(ENGLISH_STOP_WORDS)
+    print("Preprocessing...")
     train_tokens = [preprocess(text, stopwords) for text in train_texts]
     test_tokens = [preprocess(text, stopwords) for text in test_texts]
 
     vocab, freqs = build_vocab(train_tokens, vocab_size)
+    print(f"Vocab size: {len(vocab)}")
+
+    print("Building co-occurrence graph...")
     adj = build_cooc_graph(train_tokens, vocab, window_size=window_size)
 
-    walks = generate_walks(adj, num_walks=5, walk_length=10, p=1.0, q=0.5, seed=42)
-    pairs = build_pairs(walks, window_size=2)
+    print("Generating Node2Vec walks...")
+    walks = generate_walks(adj, num_walks=20, walk_length=10, p=1.0, q=0.5, seed=42)
 
+    print("Building skip-gram pairs...")
+    pairs = build_pairs(walks, window_size=2)
+    print(f"Pairs: {len(pairs)}")
+
+    print("Training skip-gram...")
     neg_dist = freqs ** 0.75
     neg_dist = neg_dist / neg_dist.sum()
     embeddings = train_skipgram(
@@ -1873,24 +1932,27 @@ def main():
         embed_dim=64,
         neg_dist=neg_dist,
         num_neg=5,
-        epochs=3,
-        batch_size=256,
+        epochs=6,
+        batch_size=2048,
         lr=0.01,
     )
 
+    print("Embedding documents...")
     X_train = embed_documents(train_tokens, vocab, embeddings)
     X_test = embed_documents(test_tokens, vocab, embeddings)
 
+    print("Training classifier...")
     clf = LogisticRegression(max_iter=1000)
     clf.fit(X_train, train_labels)
     acc = clf.score(X_test, test_labels)
     print(f"Test accuracy: {acc:.4f}")
 
+    print("Plotting t-SNE...")
     plot_tsne(embeddings, vocab, freqs, "word_tsne.png")
 
 
 if __name__ == "__main__":
     main()
-\end{lstlisting}
+\end{lstlisting}\end{lstlisting}\end{lstlisting}\end{lstlisting}
 
 \end{document}
